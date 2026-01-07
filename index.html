@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Resume | kimkuksung</title>
+  <link rel="stylesheet" href="assets/css/card.css" />
+</head>
+
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="card-wrap">
+        <!-- Business Card -->
+        <article class="card" aria-label="Business card">
+          <header class="card__top">
+            <div class="brand">
+              <!-- 로고(선택): assets/img/logo.svg 또는 텍스트 -->
+              <div class="brand__mark" aria-hidden="true">K</div>
+              <div class="brand__text">
+                <div class="brand__name">kimkuksung</div>
+                <div class="brand__tag">Resume Page</div>
+              </div>
+            </div>
+
+            <!-- 프로필(선택) -->
+            <img class="avatar" src="assets/img/profile.jpg" alt="" />
+          </header>
+
+          <div class="card__body">
+            <h1 class="title">
+              <span class="title__name">김국성</span>
+              <span class="title__role">Software Engineer</span>
+            </h1>
+
+            <dl class="meta">
+              <div class="meta__row">
+                <dt>웹</dt>
+                <dd><a href="https://kimkuksung.github.io">kimkuksung.github.io</a></dd>
+              </div>
+              <div class="meta__row">
+                <dt>이메일</dt>
+                <dd><a href="mailto:you@example.com">you@example.com</a></dd>
+              </div>
+              <div class="meta__row">
+                <dt>전화</dt>
+                <dd><a href="tel:+821012345678">010-1234-5678</a></dd>
+              </div>
+              <div class="meta__row">
+                <dt>GitHub</dt>
+                <dd><a href="https://github.com/kimkuksung">github.com/kimkuksung</a></dd>
+              </div>
+            </dl>
+
+            <div class="actions">
+              <a class="btn" href="#about">Resume</a>
+              <a class="btn btn--ghost" href="#contact">Contact</a>
+              <!-- vCard 파일을 만들면 이 버튼이 진짜 “연락처 저장”이 됨 -->
+              <a class="btn btn--ghost" href="assets/kimsung.vcf" download>Save vCard</a>
+            </div>
+          </div>
+
+          <aside class="card__qr" aria-label="QR to this page">
+            <img src="assets/img/qr.png" alt="QR: kimkuksung.github.io" />
+            <div class="qr__caption">Scan to open</div>
+          </aside>
+
+          <footer class="card__bottom">
+            <span class="pill">Available for collaboration</span>
+            <span class="muted">Last updated: <time>2026</time></span>
+          </footer>
+        </article>
+      </div>
+    </section>
+
+    <!-- 아래부터는 일반 이력서 섹션(원하면 늘리기) -->
+    <section id="about" class="section">
+      <h2>About</h2>
+      <p>여기에 한 줄 소개</p>
+    </section>
+
+    <section id="contact" class="section">
+      <h2>Contact</h2>
+      <ul>
+        <li>Email: <a href="mailto:you@example.com">you@example.com</a></li>
+        <li>GitHub: <a href="https://github.com/kimkuksung">github.com/kimkuksung</a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

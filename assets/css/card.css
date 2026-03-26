@@ -161,6 +161,9 @@ a:hover{ text-decoration: underline; }
 .btn--ghost{
   background: rgba(255,255,255,.04);
 }
+.btn--ghost2{
+  background: rgba(220,220,220,.04);
+}
 
 .card__qr{
   align-self: start;

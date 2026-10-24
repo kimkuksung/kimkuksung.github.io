@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Resume Editor | Kim Kuksung</title>
+  <link rel="stylesheet" href="assets/css/card.css" />
+  <style>
+    .page{ gap: 18px; padding-top: 28px; max-width: 1280px; }
+    .bar{
+      display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px;
+      padding:14px 16px; border-radius:16px;
+      background: linear-gradient(180deg, var(--card), var(--card2));
+      border:1px solid var(--line);
+    }
+    .bar h1{ margin:0 auto 0 0; font-size:18px; }
+    .bar h1 small{ display:block; font-size:12px; color:var(--muted); font-family:var(--mono); font-weight:500; }
+    .layout{ display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start; }
+    .col-title{ margin:0 0 10px; font-size:14px; color:var(--muted); font-family:var(--mono); }
+    .preview{ position:sticky; top:16px; }
+    .preview .section{ margin:0; }
+
+    input[type=text], input[type=password], textarea{
+      width:100%; padding:8px 10px; border-radius:10px;
+      border:1px solid var(--line); background:rgba(0,0,0,.25);
+      color:var(--text); font:inherit; font-size:14px;
+    }
+    textarea{ resize:vertical; min-height:38px; line-height:1.5; }
+    input:focus, textarea:focus{ outline:2px solid var(--accent); outline-offset:-1px; }
+    label.f{ display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+    .chk{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); white-space:nowrap; }
+
+    .entry{
+      padding:14px; margin-bottom:12px; border-radius:14px;
+      background:rgba(255,255,255,.04); border:1px solid var(--line);
+    }
+    .entry__head{ display:flex; align-items:center; gap:8px; }
+    .entry__no{ font-family:var(--mono); color:var(--accent); font-weight:700; margin-right:auto; }
+    .row{ display:flex; gap:10px; align-items:center; }
+    .detail{ display:flex; gap:6px; align-items:flex-start; margin-bottom:6px; }
+
+    .ibtn{
+      padding:5px 10px; border-radius:9px; cursor:pointer;
+      border:1px solid var(--line); background:rgba(255,255,255,.06);
+      color:var(--text); font:inherit; font-size:13px;
+    }
+    .ibtn:hover{ background:rgba(255,255,255,.12); }
+    .ibtn:disabled{ opacity:.35; cursor:default; }
+    .ibtn--danger:hover{ border-color:#f87171; color:#fca5a5; }
+    .ibtn--primary{ border-color:rgba(110,231,255,.5); background:rgba(110,231,255,.16); font-weight:700; }
+    .ibtn--wide{ width:100%; padding:9px; border-style:dashed; }
+
+    .hint{ font-size:12px; color:var(--muted); margin:6px 0 0; }
+    .hint code{ font-family:var(--mono); color:var(--accent); }
+    .status{ font-size:13px; min-height:1.4em; }
+    .status.ok{ color:#86efac; } .status.err{ color:#fca5a5; }
+    .savebar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .savebar input[type=text]{ flex:1 1 260px; }
+    .token{ flex:1 1 280px; display:flex; gap:8px; }
+    [hidden]{ display:none !important; }
+    details.guide{ font-size:13px; color:var(--muted); }
+    details.guide summary{ cursor:pointer; }
+    details.guide ol{ margin:6px 0 0; padding-left:20px; }
+
+    @media (max-width: 900px){
+      .layout{ grid-template-columns:1fr; }
+      .preview{ position:static; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <div class="bar">
+      <h1>Resume 편집기<small>kimkuksung/kimkuksung.github.io · index.html #about</small></h1>
+      <div class="token">
+        <input id="token" type="password" placeholder="GitHub 토큰 (github_pat_...)" autocomplete="off" />
+        <button id="connect" class="ibtn ibtn--primary" type="button">불러오기</button>
+      </div>
+      <label class="chk"><input id="remember" type="checkbox" /> 이 브라우저에 토큰 기억</label>
+    </div>
+
+    <details class="guide">
+      <summary>토큰 발급 방법 (최초 1회)</summary>
+      <ol>
+        <li><a class="ext-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">GitHub → Fine-grained token 생성</a> 페이지로 이동 (kimkuksung 계정으로 로그인)</li>
+        <li>Repository access: <b>Only select repositories</b> → <b>kimkuksung.github.io</b></li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
+        <li>생성된 토큰을 위 입력칸에 붙여넣고 <b>불러오기</b></li>
+      </ol>
+      <p class="hint">토큰은 이 브라우저에만 저장되며 GitHub API(api.github.com) 외에는 전송되지 않습니다. 공용 PC에서는 "기억"을 체크하지 마세요.</p>
+    </details>
+
+    <div id="status" class="status"></div>
+
+    <div id="workspace" class="layout" hidden>
+      <section>
+        <h2 class="col-title">편집</h2>
+        <button id="addTop" class="ibtn ibtn--wide" type="button">+ 맨 위에 경력 추가</button>
+        <div id="entries" style="margin-top:12px"></div>
+        <button id="addBottom" class="ibtn ibtn--wide" type="button">+ 맨 아래에 경력 추가</button>
+        <p class="hint">링크는 <code>[표시할 텍스트](https://주소)</code> 형식으로 입력합니다. 현재 직무에 체크하면 기간 뒤에 <code>(*)</code>가 붙습니다.</p>
+
+        <div class="entry" style="margin-top:18px">
+          <div class="savebar">
+            <input id="message" type="text" value="Update resume via web editor" aria-label="커밋 메시지" />
+            <button id="save" class="ibtn ibtn--primary" type="button">GitHub에 저장</button>
+          </div>
+          <label class="chk" style="margin-top:10px"><input id="touchDate" type="checkbox" checked /> 명함의 Last updated 날짜를 오늘 기준으로 갱신</label>
+          <p class="hint">저장하면 index.html이 커밋되고, 사이트에는 1~2분 후 반영됩니다.</p>
+        </div>
+      </section>
+
+      <section class="preview">
+        <h2 class="col-title">미리보기</h2>
+        <div class="section">
+          <h2>Resume</h2>
+          <ul id="preview"></ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  (() => {
+    const OWNER = 'kimkuksung', REPO = 'kimkuksung.github.io', PATH = 'index.html', BRANCH = 'main';
+    const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
+    const BLOCK_RE = /(<!-- RESUME:START[^>]*-->)([\s\S]*?)(<!-- RESUME:END -->)/;
+    const TOKEN_KEY = 'resumeEditor.token';
+
+    const $ = id => document.getElementById(id);
+    let entries = [], fileSha = null, fileHtml = null, dirty = false;
+
+    // ---------- storage (best effort) ----------
+    const store = {
+      get(){ try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } },
+      set(t, remember){
+        try {
+          localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY);
+          (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, t);
+        } catch {}
+      },
+      remembered(){ try { return !!localStorage.getItem(TOKEN_KEY); } catch { return false; } }
+    };
+
+    // ---------- encoding ----------
+    const b64ToUtf8 = b => new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, '')), c => c.charCodeAt(0)));
+    const utf8ToB64 = s => {
+      const bytes = new TextEncoder().encode(s); let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
+    };
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // [text](https://url) -> link, everything else escaped
+    const inline = s => {
+      const re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+      let out = '', last = 0, m;
+      while ((m = re.exec(s))) {
+        out += esc(s.slice(last, m.index)) +
+          `<a class="ext-link" href="${esc(m[2])}" target="_blank" rel="noopener noreferrer">${esc(m[1])}</a>`;
+        last = re.lastIndex;
+      }
+      return out + esc(s.slice(last));
+    };
+
+    // ---------- HTML <-> data ----------
+    const nodeText = n => {
+      if (n.nodeType === 3) return n.textContent;
+      if (n.nodeType !== 1) return '';
+      if (n.tagName === 'A') return `[${n.textContent}](${n.getAttribute('href')})`;
+      return [...n.childNodes].map(nodeText).join('');
+    };
+    const clean = s => s.replace(/\s+/g, ' ').trim();
+
+    function parseBlock(inner){
+      const doc = new DOMParser().parseFromString(`<ul>${inner}</ul>`, 'text/html');
+      return [...doc.querySelectorAll('li')].map(li => {
+        const raw = clean(li.querySelector('.period')?.textContent || '');
+        const strong = li.querySelector('strong');
+        let summary = '', n = strong ? strong.nextSibling : null;
+        while (n && !(n.nodeType === 1 && n.classList.contains('sub-desc'))) { summary += nodeText(n); n = n.nextSibling; }
+        return {
+          period: raw.replace(/\(\*\)$/, '').trim(),
+          current: /\(\*\)$/.test(raw),
+          title: strong ? clean(nodeText(strong)) : '',
+          summary: clean(summary).replace(/^\/\s*/, ''),
+          details: [...li.querySelectorAll('.sub-desc')].map(s => clean(nodeText(s)).replace(/^ㄴ\s*/, ''))
+        };
+      });
+    }
+
+    const entryHtml = e => [
+      '        <li>',
+      `          <span class="period">${esc(e.period.trim())}${e.current ? '(*)' : ''}</span> : <strong>${inline(e.title.trim())}</strong>${e.summary.trim() ? ' / ' + inline(e.summary.trim()) : ''}`,
+      ...e.details.filter(d => d.trim()).map(d => `          <span class="sub-desc">ㄴ ${inline(d.trim())}</span>`),
+      '        </li>'
+    ].join('\n');
+
+    const blockHtml = () => '\n' + entries.map(entryHtml).join('\n') + '\n        ';
+
+    // ---------- UI ----------
+    const setStatus = (msg, kind = '') => { const s = $('status'); s.textContent = msg; s.className = 'status ' + kind; };
+    const markDirty = () => { dirty = true; renderPreview(); };
+    const renderPreview = () => { $('preview').innerHTML = entries.map(entryHtml).join(''); };
+    const blank = () => ({ period: '', current: false, title: '', summary: '', details: [''] });
+
+    function el(tag, props = {}, ...kids){
+      const n = Object.assign(document.createElement(tag), props);
+      kids.forEach(k => n.append(k));
+      return n;
+    }
+    function field(label, value, onInput, multiline){
+      const input = multiline ? el('textarea', { rows: 2, value }) : el('input', { type: 'text', value });
+      input.addEventListener('input', () => { onInput(input.value); markDirty(); });
+      return [el('label', { className: 'f', textContent: label }), input];
+    }
+    function btn(text, onClick, cls = '', disabled = false){
+      const b = el('button', { type: 'button', className: 'ibtn ' + cls, textContent: text, disabled });
+      b.addEventListener('click', onClick);
+      return b;
+    }
+    const restructure = fn => { fn(); dirty = true; renderEntries(); };
+
+    function renderEntries(){
+      const box = $('entries'); box.textContent = '';
+      entries.forEach((e, i) => {
+        const card = el('div', { className: 'entry' });
+        card.append(el('div', { className: 'entry__head' },
+          el('span', { className: 'entry__no', textContent: `#${i + 1}  ${e.period || '(기간 미입력)'}` }),
+          btn('↑', () => restructure(() => entries.splice(i - 1, 0, ...entries.splice(i, 1))), '', i === 0),
+          btn('↓', () => restructure(() => entries.splice(i + 1, 0, ...entries.splice(i, 1))), '', i === entries.length - 1),
+          btn('삭제', () => { if (confirm(`"${e.period} ${e.title}" 항목을 삭제할까요?`)) restructure(() => entries.splice(i, 1)); }, 'ibtn--danger')
+        ));
+
+        const cur = el('input', { type: 'checkbox', checked: e.current });
+        cur.addEventListener('change', () => { e.current = cur.checked; markDirty(); });
+        const [pl, pi] = field('기간', e.period, v => { e.period = v; card.querySelector('.entry__no').textContent = `#${i + 1}  ${v || '(기간 미입력)'}`; });
+        card.append(pl, el('div', { className: 'row' }, pi, el('label', { className: 'chk' }, cur, ' 현재 직무')));
+        card.append(...field('직무 / 역할 (굵게 표시)', e.title, v => e.title = v));
+        card.append(...field('요약', e.summary, v => e.summary = v, true));
+
+        card.append(el('label', { className: 'f', textContent: '상세 내용 (ㄴ 로 표시)' }));
+        e.details.forEach((d, j) => {
+          const [, ta] = field('', d, v => e.details[j] = v, true);
+          card.append(el('div', { className: 'detail' }, ta, btn('✕', () => restructure(() => e.details.splice(j, 1)), 'ibtn--danger')));
+        });
+        card.append(btn('+ 상세 추가', () => restructure(() => e.details.push(''))));
+        box.append(card);
+      });
+      renderPreview();
+    }
+
+    // ---------- GitHub ----------
+    const headers = () => ({
+      'Authorization': `Bearer ${$('token').value.trim()}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    });
+    async function apiError(res){
+      let msg = ''; try { msg = (await res.json()).message || ''; } catch {}
+      if (res.status === 401) return '토큰이 올바르지 않거나 만료되었습니다.';
+      if (res.status === 403 || res.status === 404) return `권한이 없습니다. 토큰에 kimkuksung.github.io 저장소의 Contents 읽기/쓰기 권한이 있는지 확인하세요. (${msg})`;
+      if (res.status === 409 || res.status === 422) return '그 사이에 다른 곳에서 index.html이 수정되었습니다. "불러오기"로 최신 내용을 다시 받아주세요. (편집 중인 내용은 사라집니다)';
+      return `GitHub 오류 ${res.status}: ${msg}`;
+    }
+
+    async function load(){
+      if (!$('token').value.trim()) return setStatus('GitHub 토큰을 입력하세요.', 'err');
+      if (dirty && !confirm('저장하지 않은 변경 내용이 사라집니다. 다시 불러올까요?')) return;
+      setStatus('불러오는 중…');
+      try {
+        const res = await fetch(`${API}?ref=${BRANCH}`, { headers: headers(), cache: 'no-store' });
+        if (!res.ok) return setStatus(await apiError(res), 'err');
+        const data = await res.json();
+        const html = b64ToUtf8(data.content);
+        const m = html.match(BLOCK_RE);
+        if (!m) return setStatus('index.html에서 RESUME:START / RESUME:END 표시를 찾지 못했습니다.', 'err');
+        fileHtml = html; fileSha = data.sha;
+        entries = parseBlock(m[2]);
+        entries.forEach(e => { if (!e.details.length) e.details.push(''); });
+        dirty = false;
+        store.set($('token').value.trim(), $('remember').checked);
+        $('workspace').hidden = false;
+        renderEntries();
+        setStatus(`불러오기 완료 · 경력 ${entries.length}건`, 'ok');
+      } catch (err) {
+        setStatus('불러오기 실패: ' + err.message, 'err');
+      }
+    }
+
+    async function save(){
+      if (!fileHtml) return;
+      const bad = entries.findIndex(e => !e.period.trim() || !e.title.trim());
+      if (bad >= 0) return setStatus(`#${bad + 1} 항목의 기간과 직무/역할은 꼭 입력해야 합니다.`, 'err');
+
+      let html = fileHtml.replace(BLOCK_RE, (_, a, __, c) => a + blockHtml() + c);
+      if ($('touchDate').checked) {
+        const d = new Date(), y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0');
+        html = html.replace(/(Last updated: <time datetime=")[^"]*(">)[^<]*(<\/time>)/, `$1${y}-${mo}$2${y}.${mo}$3`);
+      }
+      if (html === fileHtml) return setStatus('변경된 내용이 없습니다.');
+
+      $('save').disabled = true; setStatus('저장 중…');
+      try {
+        const res = await fetch(API, {
+          method: 'PUT', headers: headers(),
+          body: JSON.stringify({ message: $('message').value.trim() || 'Update resume via web editor', content: utf8ToB64(html), sha: fileSha, branch: BRANCH })
+        });
+        if (!res.ok) return setStatus(await apiError(res), 'err');
+        const data = await res.json();
+        fileHtml = html; fileSha = data.content.sha; dirty = false;
+        setStatus(`저장 완료 (커밋 ${data.commit.sha.slice(0, 7)}). 사이트에는 1~2분 후 반영됩니다.`, 'ok');
+      } catch (err) {
+        setStatus('저장 실패: ' + err.message, 'err');
+      } finally {
+        $('save').disabled = false;
+      }
+    }
+
+    // ---------- wire up ----------
+    $('token').value = store.get();
+    $('remember').checked = store.remembered();
+    $('remember').addEventListener('change', () => { if ($('token').value.trim()) store.set($('token').value.trim(), $('remember').checked); });
+    $('connect').addEventListener('click', load);
+    $('token').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+    $('save').addEventListener('click', save);
+    $('addTop').addEventListener('click', () => restructure(() => entries.unshift(blank())));
+    $('addBottom').addEventListener('click', () => restructure(() => entries.push(blank())));
+    window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+    if ($('token').value) load();
+  })();
+  </script>
+</body>
+</html>

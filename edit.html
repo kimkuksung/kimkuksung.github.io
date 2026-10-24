@@ -39,6 +39,10 @@
     .entry__no{ font-family:var(--mono); color:var(--accent); font-weight:700; margin-right:auto; }
     .row{ display:flex; gap:10px; align-items:center; }
     .detail{ display:flex; gap:6px; align-items:flex-start; margin-bottom:6px; }
+    .tabs{ display:flex; gap:6px; margin-bottom:12px; }
+    .tab{ padding:7px 16px; border-radius:10px 10px 0 0; border-bottom-width:2px; }
+    .tab[aria-selected=true]{ border-bottom-color:var(--accent); color:var(--accent); font-weight:700; background:rgba(110,231,255,.10); }
+    textarea.tags{ min-height:120px; font-family:var(--mono); font-size:13px; }
 
     .ibtn{
       padding:5px 10px; border-radius:9px; cursor:pointer;
@@ -73,7 +77,7 @@
 <body>
   <main class="page">
     <div class="bar">
-      <h1>Resume 편집기<small>kimkuksung/kimkuksung.github.io · index.html #about</small></h1>
+      <h1>Resume 편집기<small>kimkuksung/kimkuksung.github.io · index.html #about · #skill</small></h1>
       <div class="token">
         <input id="token" type="password" placeholder="GitHub 토큰 (github_pat_...)" autocomplete="off" />
         <button id="connect" class="ibtn ibtn--primary" type="button">불러오기</button>
@@ -96,11 +100,23 @@
 
     <div id="workspace" class="layout" hidden>
       <section>
-        <h2 class="col-title">편집</h2>
-        <button id="addTop" class="ibtn ibtn--wide" type="button">+ 맨 위에 경력 추가</button>
-        <div id="entries" style="margin-top:12px"></div>
-        <button id="addBottom" class="ibtn ibtn--wide" type="button">+ 맨 아래에 경력 추가</button>
-        <p class="hint">링크는 <code>[표시할 텍스트](https://주소)</code> 형식으로 입력합니다. 현재 직무에 체크하면 기간 뒤에 <code>(*)</code>가 붙습니다.</p>
+        <div class="tabs" role="tablist">
+          <button class="ibtn tab" type="button" role="tab" data-tab="resume" aria-selected="true">Resume</button>
+          <button class="ibtn tab" type="button" role="tab" data-tab="skills" aria-selected="false">Skills &amp; Core Competencies</button>
+        </div>
+
+        <div data-pane="resume">
+          <button id="addTop" class="ibtn ibtn--wide" type="button">+ 맨 위에 경력 추가</button>
+          <div id="entries" style="margin-top:12px"></div>
+          <button id="addBottom" class="ibtn ibtn--wide" type="button">+ 맨 아래에 경력 추가</button>
+          <p class="hint">링크는 <code>[표시할 텍스트](https://주소)</code> 형식으로 입력합니다. 현재 직무에 체크하면 기간 뒤에 <code>(*)</code>가 붙습니다.</p>
+        </div>
+
+        <div data-pane="skills" hidden>
+          <div id="groups"></div>
+          <button id="addGroup" class="ibtn ibtn--wide" type="button">+ 스킬 그룹 추가</button>
+          <p class="hint">태그는 <b>한 줄에 하나씩</b> 입력합니다. 빈 줄은 무시됩니다.</p>
+        </div>
 
         <div class="entry" style="margin-top:18px">
           <div class="savebar">
@@ -108,15 +124,19 @@
             <button id="save" class="ibtn ibtn--primary" type="button">GitHub에 저장</button>
           </div>
           <label class="chk" style="margin-top:10px"><input id="touchDate" type="checkbox" checked /> 명함의 Last updated 날짜를 오늘 기준으로 갱신</label>
-          <p class="hint">저장하면 index.html이 커밋되고, 사이트에는 1~2분 후 반영됩니다.</p>
+          <p class="hint">Resume와 Skills 변경 내용이 함께 index.html 한 커밋으로 저장되고, 사이트에는 1~2분 후 반영됩니다.</p>
         </div>
       </section>
 
       <section class="preview">
         <h2 class="col-title">미리보기</h2>
-        <div class="section">
+        <div class="section" data-pane="resume">
           <h2>Resume</h2>
           <ul id="preview"></ul>
+        </div>
+        <div class="section" data-pane="skills" hidden>
+          <h2>Skills &amp; Core Competencies</h2>
+          <div id="skillPreview" class="skill-grid"></div>
         </div>
       </section>
     </div>
@@ -126,11 +146,12 @@
   (() => {
     const OWNER = 'kimkuksung', REPO = 'kimkuksung.github.io', PATH = 'index.html', BRANCH = 'main';
     const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
-    const BLOCK_RE = /(<!-- RESUME:START[^>]*-->)([\s\S]*?)(<!-- RESUME:END -->)/;
+    const RESUME_RE = /(<!-- RESUME:START[^>]*-->)([\s\S]*?)(<!-- RESUME:END -->)/;
+    const SKILLS_RE = /(<!-- SKILLS:START[^>]*-->)([\s\S]*?)(<!-- SKILLS:END -->)/;
     const TOKEN_KEY = 'resumeEditor.token';
 
     const $ = id => document.getElementById(id);
-    let entries = [], fileSha = null, fileHtml = null, dirty = false;
+    let entries = [], groups = [], fileSha = null, fileHtml = null, dirty = false;
 
     // ---------- storage (best effort) ----------
     const store = {
@@ -198,13 +219,41 @@
       '        </li>'
     ].join('\n');
 
-    const blockHtml = () => '\n' + entries.map(entryHtml).join('\n') + '\n        ';
+    const resumeBlock = () => '\n' + entries.map(entryHtml).join('\n') + '\n        ';
+
+    function parseSkills(inner){
+      const doc = new DOMParser().parseFromString(`<div>${inner}</div>`, 'text/html');
+      return [...doc.querySelectorAll('.skill-box')].map(box => ({
+        title: clean(box.querySelector('.skill-box__title')?.textContent || ''),
+        tags: [...box.querySelectorAll('.tag')].map(t => clean(t.textContent))
+      }));
+    }
+
+    const groupHtml = g => [
+      '        <div class="skill-box">',
+      `          <div class="skill-box__title">${esc(g.title.trim())}</div>`,
+      '          <div class="tag-list">',
+      ...g.tags.map(t => t.trim()).filter(Boolean).map(t => `            <span class="tag">${esc(t)}</span>`),
+      '          </div>',
+      '        </div>'
+    ].join('\n');
+
+    const skillsBlock = () => '\n' + groups.map(groupHtml).join('\n') + '\n        ';
 
     // ---------- UI ----------
     const setStatus = (msg, kind = '') => { const s = $('status'); s.textContent = msg; s.className = 'status ' + kind; };
     const markDirty = () => { dirty = true; renderPreview(); };
-    const renderPreview = () => { $('preview').innerHTML = entries.map(entryHtml).join(''); };
+    const renderPreview = () => {
+      $('preview').innerHTML = entries.map(entryHtml).join('');
+      $('skillPreview').innerHTML = groups.map(groupHtml).join('');
+    };
     const blank = () => ({ period: '', current: false, title: '', summary: '', details: [''] });
+
+    function showTab(name){
+      document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+      document.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== name);
+      try { sessionStorage.setItem('resumeEditor.tab', name); } catch {}
+    }
 
     function el(tag, props = {}, ...kids){
       const n = Object.assign(document.createElement(tag), props);
@@ -221,7 +270,7 @@
       b.addEventListener('click', onClick);
       return b;
     }
-    const restructure = fn => { fn(); dirty = true; renderEntries(); };
+    const restructure = fn => { fn(); dirty = true; renderEntries(); renderGroups(); };
 
     function renderEntries(){
       const box = $('entries'); box.textContent = '';
@@ -252,6 +301,27 @@
       renderPreview();
     }
 
+    function renderGroups(){
+      const box = $('groups'); box.textContent = '';
+      groups.forEach((g, i) => {
+        const card = el('div', { className: 'entry' });
+        const no = el('span', { className: 'entry__no', textContent: `#${i + 1}  ${g.title || '(그룹명 미입력)'}` });
+        card.append(el('div', { className: 'entry__head' },
+          no,
+          btn('↑', () => restructure(() => groups.splice(i - 1, 0, ...groups.splice(i, 1))), '', i === 0),
+          btn('↓', () => restructure(() => groups.splice(i + 1, 0, ...groups.splice(i, 1))), '', i === groups.length - 1),
+          btn('삭제', () => { if (confirm(`"${g.title}" 그룹을 삭제할까요?`)) restructure(() => groups.splice(i, 1)); }, 'ibtn--danger')
+        ));
+        card.append(...field('그룹명', g.title, v => { g.title = v; no.textContent = `#${i + 1}  ${v || '(그룹명 미입력)'}`; }));
+        card.append(el('label', { className: 'f', textContent: '태그 (한 줄에 하나)' }));
+        const ta = el('textarea', { className: 'tags', value: g.tags.join('\n'), rows: Math.max(4, g.tags.length + 1) });
+        ta.addEventListener('input', () => { g.tags = ta.value.split('\n'); markDirty(); });
+        card.append(ta);
+        box.append(card);
+      });
+      renderPreview();
+    }
+
     // ---------- GitHub ----------
     const headers = () => ({
       'Authorization': `Bearer ${$('token').value.trim()}`,
@@ -275,16 +345,18 @@
         if (!res.ok) return setStatus(await apiError(res), 'err');
         const data = await res.json();
         const html = b64ToUtf8(data.content);
-        const m = html.match(BLOCK_RE);
+        const m = html.match(RESUME_RE), s = html.match(SKILLS_RE);
         if (!m) return setStatus('index.html에서 RESUME:START / RESUME:END 표시를 찾지 못했습니다.', 'err');
+        if (!s) return setStatus('index.html에서 SKILLS:START / SKILLS:END 표시를 찾지 못했습니다.', 'err');
         fileHtml = html; fileSha = data.sha;
         entries = parseBlock(m[2]);
         entries.forEach(e => { if (!e.details.length) e.details.push(''); });
+        groups = parseSkills(s[2]);
         dirty = false;
         store.set($('token').value.trim(), $('remember').checked);
         $('workspace').hidden = false;
-        renderEntries();
-        setStatus(`불러오기 완료 · 경력 ${entries.length}건`, 'ok');
+        renderEntries(); renderGroups();
+        setStatus(`불러오기 완료 · 경력 ${entries.length}건 · 스킬 그룹 ${groups.length}개`, 'ok');
       } catch (err) {
         setStatus('불러오기 실패: ' + err.message, 'err');
       }
@@ -293,9 +365,13 @@
     async function save(){
       if (!fileHtml) return;
       const bad = entries.findIndex(e => !e.period.trim() || !e.title.trim());
-      if (bad >= 0) return setStatus(`#${bad + 1} 항목의 기간과 직무/역할은 꼭 입력해야 합니다.`, 'err');
+      if (bad >= 0) { showTab('resume'); return setStatus(`Resume #${bad + 1} 항목의 기간과 직무/역할은 꼭 입력해야 합니다.`, 'err'); }
+      const badG = groups.findIndex(g => !g.title.trim() || !g.tags.some(t => t.trim()));
+      if (badG >= 0) { showTab('skills'); return setStatus(`Skills #${badG + 1} 그룹의 그룹명과 태그(1개 이상)는 꼭 입력해야 합니다.`, 'err'); }
 
-      let html = fileHtml.replace(BLOCK_RE, (_, a, __, c) => a + blockHtml() + c);
+      let html = fileHtml
+        .replace(RESUME_RE, (_, a, __, c) => a + resumeBlock() + c)
+        .replace(SKILLS_RE, (_, a, __, c) => a + skillsBlock() + c);
       if ($('touchDate').checked) {
         const d = new Date(), y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, '0');
         html = html.replace(/(Last updated: <time datetime=")[^"]*(">)[^<]*(<\/time>)/, `$1${y}-${mo}$2${y}.${mo}$3`);
@@ -328,6 +404,9 @@
     $('save').addEventListener('click', save);
     $('addTop').addEventListener('click', () => restructure(() => entries.unshift(blank())));
     $('addBottom').addEventListener('click', () => restructure(() => entries.push(blank())));
+    $('addGroup').addEventListener('click', () => restructure(() => groups.push({ title: '', tags: [] })));
+    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+    try { showTab(sessionStorage.getItem('resumeEditor.tab') || 'resume'); } catch { showTab('resume'); }
     window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
     if ($('token').value) load();
   })();

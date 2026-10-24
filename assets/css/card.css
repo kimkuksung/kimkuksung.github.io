@@ -229,6 +229,7 @@ a:hover{ text-decoration: underline; }
   color: var(--accent);
 }
 .muted{ color: var(--muted); }
+.hidden-link, .hidden-link:hover{ color: inherit; text-decoration: none; cursor: inherit; }
 
 .section{
   width: min(980px, 100%);
